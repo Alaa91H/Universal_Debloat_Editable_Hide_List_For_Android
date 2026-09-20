@@ -15,7 +15,6 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
 body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:linear-gradient(160deg,var(--bg),var(--bg2));color:var(--txt);min-height:100vh}
-[dir=rtl] body{font-family:"Segoe UI",Tahoma,Arial,sans-serif}
 .wrap{max-width:1100px;margin:0 auto;padding:18px 14px 90px}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 h1{font-size:20px;margin:0}
@@ -28,8 +27,6 @@ h1 small{display:block;color:var(--sub);font-size:12px;font-weight:400;margin-to
 .meta{color:var(--sub)}
 .badge{background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:11px;color:var(--sub)}
 .toprow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.langbtn{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600}
-.langbtn:hover{border-color:var(--acc)}
 .sec{font-size:13px;font-weight:700;color:var(--sub);margin:14px 2px 8px;display:flex;align-items:center;gap:8px}
 .sec::after{content:"";flex:1;height:1px;background:var(--line)}
 .presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
@@ -97,7 +94,6 @@ h1 small{display:block;color:var(--sub);font-size:12px;font-weight:400;margin-to
     <h1 id="t_title">🧹 Universal Debloat Builder
       <small id="t_sub">Systemless app manager - no partitions modified</small></h1>
     <div class="toprow">
-      <button class="langbtn" id="langBtn">🌐 العربية</button>
       <div class="card dev" style="margin:0;padding:10px 14px">
         <span class="dot" id="dot"></span>
         <b id="dModel">Connecting…</b>
@@ -178,7 +174,6 @@ h1 small{display:block;color:var(--sub);font-size:12px;font-weight:400;margin-to
 <div class="toast" id="toast"></div>
 
 <script>
-let LANG='en';
 const I18N={
  en:{
   noAsk:"Silent install (skip recovery menus)",
@@ -212,48 +207,16 @@ const I18N={
   helpBody:`<p><b>Presets</b></p><p>🛡️ <b>Safe</b> — harmless convenience/bloat apps only.</p><p>⚖️ <b>Default</b> — adds non-essential Google apps plus everything already disabled on the device.</p><p>🔥 <b>Maximum</b> — everything that is not critical (you may lose some features).</p><p>🎯 <b>Custom</b> — activates automatically when you edit any app.</p><p><b>Action modes</b></p><p>🗑️ <b>Uninstall</b> — hides the package completely for user 0 (restored when the module is removed).</p><p>⏸️ <b>Disable</b> — the package shows as "Disabled" in system settings; safest option, instantly reversible.</p><p><b>Highlighting:</b> red dashed border = critical system package (blocked by default; toggle "Show risky" to override at your own risk).</p><p><b>⚡ Clean ROM:</b> skips the first-boot setup wizard entirely.</p><p><b>Restore:</b> delete the module from your root manager, or prefix the package with <code dir="ltr">!</code> in <code dir="ltr">/data/adb/debloat_list.conf</code> and reboot.</p>`,
   deviceOf:(m,d,a,r)=>`${m} (${d})`,metaOf:(a,r)=>`Android ${a} • ${r}`,
   confKept:"- keeping existing /data/adb/debloat_list.conf",
- },
- ar:{
-  noAsk:"تثبيت صامت (تجاوز قوائم الريكفري)",
-  title:"🧹 منشّئ التخفيف الشامل",sub:"مدير تطبيقات النظام بدون تعديل الأقسام",
-  connecting:"جارٍ الاتصال…",noDevice:"❌ لا يوجد جهاز متصل",usbHint:"فعّل تصحيح USB أو اللاسلكي",
-  presetSec:"نمط الاختيار",modeSec:"نمط الإجراء",
-  pSafe:"الآمن",dSafe:"تطبيقات غير ضرورية فقط<br>بدون أي خطر",
-  pDefault:"الافتراضي",dDefault:"+ تطبيقات جوجل غير الأساسية<br>وما هو معطّل مسبقاً",
-  pMax:"الأقصى",dMax:"كل ما يمكن إزالته بأمان معقول<br>(قد تفقد بعض الميزات)",
-  pCustom:"مخصص",dCustom:"اختيارك اليدوي<br>(يُفعّل تلقائياً عند التعديل)",
-  mUnin:"حذف (إخفاء تام)",dUnin:"تختفي الحزمة تماماً من المستخدم 0، وتُستعاد بالكامل عند حذف الموديول.",
-  mDis:"تعطيل (موصى به)",dDis:"تظهر الحزمة كـ«معطّل» في الإعدادات. الأسهل أماناً والأسرع استعادةً.",
-  cleanText:"<b>وضع الروم النظيف:</b> يُنهي معالج الإعداد تلقائياً عند أول إقلاع بعد التفليش، فيفتح الجهاز الشاشة الرئيسية مباشرة بدون تسجيل حساب أو خطوات أولى.",
-  cleanEnable:"تفعيل وضع الروم النظيف",
-  searchPh:"🔍 ابحث باسم الحزمة أو التطبيق…",fSel:"المحدد فقط",fCrit:"إظهار الخطرة",fDis:"المعطّل مسبقاً",verify:"تحقق",
-  shown:"الظاهرة",selected:"المحدد",risky:"خطرة",predis:"المعطّلة مسبقاً",
-  loading:"جارٍ قراءة تطبيقات الروم…",will:"سيتم معالجة",apps:"تطبيق",buildzip:"بناء zip فقط",
-  install:"تثبيت على الهاتف الآن",reboot:"إعادة التشغيل الآن",
-  noPkgs:"لم تحدد أي تطبيق",building:"جارٍ البناء…",installingTitle:"⏳ جارٍ التثبيت",
-  installingBody:p=>`<p><span class="spin"></span> يُبنى الموديول ويُدفع إلى الهاتف ويُطبَّق الإجراء… لا تغلق النافذة.<br><br>الحزم: <b>${p.n}</b> • النمط: <b>${p.mode==='disable'?'تعطيل':'حذف'}</b>${p.clean?'<br>⚡ وضع الروم النظيف: <b>مفعّل</b>':''}</p>`,
-  doneTitle:"✅ تم التثبيت بنجاح",
-  doneBody:(j)=>`<p>تمت معالجة <b>${j.count}</b> حزمة على الهاتف.</p>${j.restored&&j.restored.length?`<p style="color:#7fe0a8">↩️ تمت استعادة <b>${j.restored.length}</b> تطبيق ألغيت تحديده:</p><pre style="max-height:120px">${j.restored.join('\n')}</pre>`:''}<p>التعديلات ثابتة بعد إعادة التشغيل (الموديول مثبّت في مجلد إضافات المدير).</p><details><summary style="cursor:pointer;color:var(--sub)">سجل التنفيذ</summary><pre>${(j.log||'').replace(/</g,'&lt;')}</pre></details>`,
-  buildDone:(j)=>`<p>تم إنشاء ملف zip:</p><pre>${j.file}</pre><p>الحجم: ${(j.size/1024).toFixed(1)} KB — الحزم: <b>${j.count}</b></p><p>يمكن تفليشه عبر مدير الروت (الإضافات ← التثبيت من الذاكرة) أو ريكفري مخصص.</p>`,
-  errTitle:"❌ خطأ",failTitle:"❌ فشل التثبيت",
-  verifyAll:n=>`✅ ممتاز: كل ${n} تطبيق مُعالَج فعلاً على الهاتف`,
-  verifySome:(v,t)=>`⚠️ ${v} من ${t} ما زالت ظاهرة`,
-  verifyFail:m=>`❌ فشل التحقق: ${m}`,
-  keptToast:"🛡️ هذه الحزمة محفوظة دائماً بقاعدة ! في ملف الإعدادات",
-  critToast:'⚠️ حزمة حرِجة — فعّل "إظهار الخطرة" واضغط مرتين للتأكيد',
-  buildNone:"لم تحدد أي تطبيق",
-  helpBody:`<p><b>الأنماط:</b></p><p>🛡️ <b>الآمن</b> — تطبيقات غير ضرورية وآمنة تماماً.</p><p>⚖️ <b>الافتراضي</b> — يضيف تطبيقات جوجل غير الأساسية + كل ما هو معطّل مسبقاً على جهازك.</p><p>🔥 <b>الأقصى</b> — كل الحزم غير الحرجة (قد تفقد بعض الميزات).</p><p>🎯 <b>مخصص</b> — يُفعّل تلقائياً عند تعديلك لأي تطبيق.</p><p><b>أنماط الإجراء:</b></p><p>🗑️ <b>حذف</b> — يخفي الحزمة كلياً عن المستخدم 0 (تُستعاد عند حذف الموديول).</p><p>⏸️ <b>تعطيل</b> — تظهر الحزمة كـ«معطّل» في إعدادات النظام؛ الأكثر أماناً وقابل للتراجع فوراً.</p><p><b>التمييز:</b> الإطار الأحمر المتقطع = حزمة نظام حرِجة (محجوبة افتراضياً، فعّل «إظهار الخطرة» على مسؤوليتك).</p><p><b>⚡ الروم النظيف:</b> يتخطى معالج الإعداد عند أول إقلاع.</p><p><b>الاستعادة:</b> احذف الموديول من مدير الروت، أو أضف <code dir="ltr">!</code> قبل اسم الحزمة في <code dir="ltr">/data/adb/debloat_list.conf</code> وأعد التشغيل.</p>`,
-  deviceOf:(m,d)=>`${m} (${d})`,metaOf:(a,r)=>`أندرويد ${a} • ${r}`,
  }
 };
 let ALL=[], KEEP=new Set(), SEL=new Set(), preset='safe', q='', fSel=false, fCrit=true, fDis=false, MODE='uninstall';
 const $=id=>document.getElementById(id);
-const T=k=>I18N[LANG][k];
+const T=k=>I18N.en[k];
 
 function applyLang(){
-  document.documentElement.lang=LANG;
-  document.documentElement.dir=LANG==='ar'?'rtl':'ltr';
-  const t=I18N[LANG];
+  document.documentElement.lang='en';
+  document.documentElement.dir='ltr';
+  const t=I18N.en;
   $('t_title').childNodes[0].textContent=t.title;
   $('t_sub').textContent=t.sub;
   $('t_presetSec').textContent=t.presetSec; $('t_modeSec').textContent=t.modeSec;
@@ -279,21 +242,19 @@ function applyLang(){
   $('mReboot').innerHTML='🔄 '+t.reboot;
   render();
 }
-$('langBtn').onclick=()=>{LANG=LANG==='en'?'ar':'en';$('langBtn').textContent=LANG==='en'?'🌐 العربية':'🌐 English';applyLang();};
-
 function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3200);}
 function modal(title,body,showReboot){$('mTitle').textContent=title;$('mBody').innerHTML=body;$('mReboot').style.display=showReboot?'inline-block':'none';$('modal').classList.add('show');}
 $('mOk').onclick=()=>$('modal').classList.remove('show');
-$('mReboot').onclick=async()=>{await fetch('/api/reboot',{method:'POST'});modal('⏳',LANG==='ar'?'الهاتف يعيد التشغيل…':'Device is rebooting…');};
+$('mReboot').onclick=async()=>{await fetch('/api/reboot',{method:'POST'});modal('⏳','Device is rebooting…');};
 
 async function loadStatus(){
   try{
     const r=await (await fetch('/api/status')).json();
     $('dot').classList.toggle('on',r.connected);
     const t=T('');
-    $('dModel').textContent=r.connected?I18N[LANG].deviceOf(r.model,r.device):I18N[LANG].noDevice;
-    $('dMeta').textContent=r.connected?I18N[LANG].metaOf(r.android,r.rom):I18N[LANG].usbHint;
-  }catch(e){$('dModel').textContent=I18N[LANG].noDevice;}
+    $('dModel').textContent=r.connected?I18N.en.deviceOf(r.model,r.device):I18N.en.noDevice;
+    $('dMeta').textContent=r.connected?I18N.en.metaOf(r.android,r.rom):I18N.en.usbHint;
+  }catch(e){$('dModel').textContent=I18N.en.noDevice;}
 }
 async function loadPackages(){
   try{
@@ -335,30 +296,30 @@ function render(){
         <div class="nm">${p.label}</div>
         <div class="pk">${p.package}</div>
         <div class="tags">
-          ${p.risk==='critical'?`<span class="tag r">⚠️ ${LANG==='ar'?'خطِر':'risky'}</span>`:''}
-          ${KEEP.has(p.package)?`<span class="tag g">🛡️ ${LANG==='ar'?'محفوظ (!)':'kept (!)'}</span>`:''}
-          ${p.currentlyHidden?`<span class="tag g">${LANG==='ar'?'مُعالَج حالياً':'currently processed'}</span>`:''}
-          ${p.presetDisabled?`<span class="tag d">${LANG==='ar'?'معطّل مسبقاً':'pre-disabled'}</span>`:''}
+          ${p.risk==='critical'?`<span class="tag r">⚠️ risky</span>`:''}
+          ${KEEP.has(p.package)?`<span class="tag g">🛡️ kept (!)</span>`:''}
+          ${p.currentlyHidden?`<span class="tag g">currently processed</span>`:''}
+          ${p.presetDisabled?`<span class="tag d">pre-disabled</span>`:''}
           ${p.warn?`<span class="tag">${p.warn}</span>`:''}
         </div>
       </div>
       <div class="cb">${sel?'✓':''}</div>
     </div>`);
   }
-  $('list').innerHTML=frag.length?frag.join(''):`<div class="empty">${LANG==='ar'?'لا نتائج مطابقة':'No matches'}</div>`;
+  $('list').innerHTML=frag.length?frag.join(''):`<div class="empty">No matches</div>`;
   $('sVis').textContent=vis;$('sSel').textContent=SEL.size;$('bCnt').textContent=SEL.size;
   $('sCrit').textContent=ALL.filter(p=>p.risk==='critical').length;
   $('sDis').textContent=ALL.filter(p=>p.presetDisabled).length;
-  $('countInfo').textContent=`${ALL.length} ${LANG==='ar'?'حزمة نظام':'system packages'}`;
+  $('countInfo').textContent=`${ALL.length} system packages`;
   document.querySelectorAll('.app').forEach(el=>el.onclick=()=>toggle(el.dataset.p));
   updPresetNums();
 }
 function toggle(pkg){
   const p=ALL.find(x=>x.package===pkg);
-  if(KEEP.has(pkg)){toast(I18N[LANG].keptToast);return;}
+  if(KEEP.has(pkg)){toast(I18N.en.keptToast);return;}
   if(SEL.has(pkg)){SEL.delete(pkg);}
   else{
-    if(p.risk==='critical'&&!confirmForce){toast(I18N[LANG].critToast);return;}
+    if(p.risk==='critical'&&!confirmForce){toast(I18N.en.critToast);return;}
     SEL.add(pkg);
   }
   setCustom();render();
@@ -402,33 +363,33 @@ async function post(url,body){
   return j;
 }
 $('btnZip').onclick=async()=>{
-  if(!SEL.size)return toast(I18N[LANG].buildNone);
-  $('btnZip').disabled=true;$('btnZip').innerHTML='<span class="spin"></span> '+I18N[LANG].building;
+  if(!SEL.size)return toast(I18N.en.buildNone);
+  $('btnZip').disabled=true;$('btnZip').innerHTML='<span class="spin"></span> '+I18N.en.building;
   try{const j=await post('/api/build',{selected:[...SEL],cleanRom:$('cleanRom').checked,mode:MODE,noAsk:$('noAsk').checked});
-    modal('📦',I18N[LANG].buildDone(j),false);
-  }catch(e){modal(I18N[LANG].errTitle,`<pre>${e.message}</pre>`,false);}
-  $('btnZip').disabled=false;$('btnZip').innerHTML='📦 '+I18N[LANG].buildzip;
+    modal('📦',I18N.en.buildDone(j),false);
+  }catch(e){modal(I18N.en.errTitle,`<pre>${e.message}</pre>`,false);}
+  $('btnZip').disabled=false;$('btnZip').innerHTML='📦 '+I18N.en.buildzip;
 };
 $('btnGo').onclick=async()=>{
-  if(!SEL.size)return toast(I18N[LANG].buildNone);
+  if(!SEL.size)return toast(I18N.en.buildNone);
   const clean=$('cleanRom').checked;
-  modal(I18N[LANG].installingTitle,I18N[LANG].installingBody({n:SEL.size,mode:MODE,clean}),false);
+  modal(I18N.en.installingTitle,I18N.en.installingBody({n:SEL.size,mode:MODE,clean}),false);
   try{
     const j=await post('/api/install',{selected:[...SEL],cleanRom:clean,mode:MODE,noAsk:$('noAsk').checked});
-    modal(I18N[LANG].doneTitle,I18N[LANG].doneBody(j),true);
-  }catch(e){modal(I18N[LANG].failTitle,`<pre>${e.message}</pre>`,false);}
+    modal(I18N.en.doneTitle,I18N.en.doneBody(j),true);
+  }catch(e){modal(I18N.en.failTitle,`<pre>${e.message}</pre>`,false);}
 };
 $('btnVer').onclick=async()=>{
-  if(!SEL.size)return toast(I18N[LANG].buildNone);
+  if(!SEL.size)return toast(I18N.en.buildNone);
   toast('⏳ …');
   try{
     const j=await post('/api/verify',{selected:[...SEL],mode:MODE});
     const v=j.visible||[];
-    if(!v.length){toast(I18N[LANG].verifyAll(SEL.size));}
-    else{toast(I18N[LANG].verifySome(v.length,SEL.size)+': '+v.slice(0,3).join(', ')+(v.length>3?'…':''));}
-  }catch(e){toast(I18N[LANG].verifyFail(e.message));}
+    if(!v.length){toast(I18N.en.verifyAll(SEL.size));}
+    else{toast(I18N.en.verifySome(v.length,SEL.size)+': '+v.slice(0,3).join(', ')+(v.length>3?'…':''));}
+  }catch(e){toast(I18N.en.verifyFail(e.message));}
 };
-$('btnHelp').onclick=()=>modal('❓',I18N[LANG].helpBody,false);
+$('btnHelp').onclick=()=>modal('❓',I18N.en.helpBody,false);
 
 applyLang();loadStatus();loadPackages();setInterval(loadStatus,8000);
 </script>

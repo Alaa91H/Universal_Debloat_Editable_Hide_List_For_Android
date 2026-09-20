@@ -24,14 +24,13 @@ removing the module restores everything.
   first-boot setup wizard entirely.
 - 🖥️ **Interactive web UI** (optional) — browse every package on the device,
   pick presets (Safe / Default / Maximum / Custom), choose the action mode,
-  and build or flash the module straight from the browser. English + Arabic
-  included; more languages are easy to add.
+  and build or flash the module straight from the browser. English UI.
 - 🔘 **Interactive recovery installer** — when flashed from TWRP/OrangeFox the
-  installer shows volume-key menus (language EN/AR, preset,
-  uninstall/disable, clean-ROM). The selected option is always visible with
+  installer shows volume-key menus (preset, uninstall/disable, clean-ROM).
+  The selected option is always visible with
   a `==>` marker that moves on every keypress. Menus have **no time
   limit**: after your first keypress the installer waits indefinitely for
-  as long as you need, and never picks an option for you. The language choice is remembered for the next flash. Full touch
+  as long as you need, and never picks an option for you. Full touch
   UIs inside recovery (AROMA) are effectively dead on modern devices, so
   volume keys are the portable way. Add a `noask` file inside the zip (or
   build with `--preset`) for a fully silent install.
@@ -72,8 +71,7 @@ python server.py        # requires adb in PATH and the device connected
 
 Open <http://127.0.0.1:8765>. The UI reads every package from the connected
 device, highlights risky ones, and can build or install the module with one
-click. Language switcher (EN/AR) is built in — add a new dictionary to the
-`I18N` object in `webui/index.html` to support another language.
+click.
 
 ## Building
 

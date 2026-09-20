@@ -13,7 +13,7 @@ import sys
 import zipfile
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-OUT_DEFAULT = "Universal_Debloat_v3.1.2.zip"
+OUT_DEFAULT = "Universal_Debloat_v3.2.0.zip"
 
 ENTRIES = [
     ("module/blank.apk", "blank.apk", 0o644),

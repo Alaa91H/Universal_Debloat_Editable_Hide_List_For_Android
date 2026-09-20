@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-09-20
+
+### Removed
+- **All Arabic language support.** The project is now English-only and
+  stays that way.
+  - Recovery installer: the language menu is gone, so flashing starts
+    directly with the preset menu; all installer messages are English.
+    The legacy `/data/adb/debloat_lang` file is no longer read or written.
+  - Web UI: the Arabic translation table, the language switcher button,
+    RTL handling, and all inline bilingual ternaries are removed. The UI
+    is served in English only.
+
 ## [3.1.2] - 2026-09-20
 
 ### Changed
@@ -124,6 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - All device- and ROM-specific defaults from the module scripts.
 
+[3.2.0]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.2.0
 [3.1.2]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.2
 [3.1.1]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.1
 [3.1.0]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.0
