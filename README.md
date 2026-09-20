@@ -28,12 +28,13 @@ removing the module restores everything.
   included; more languages are easy to add.
 - 🔘 **Interactive recovery installer** — when flashed from TWRP/OrangeFox the
   installer shows volume-key menus (language EN/AR, preset,
-  uninstall/disable, clean-ROM) with a timeout fallback, so it also works
-  unattended and on recoveries that cannot deliver key events. Full touch
+  uninstall/disable, clean-ROM). The selected option is always visible with
+  a `==>` marker that moves on every keypress, and the 15 s idle timeout
+  only applies after the last keypress, so you can take as long as you
+  need. The language choice is remembered for the next flash. Full touch
   UIs inside recovery (AROMA) are effectively dead on modern devices, so
-  volume keys are the portable way. The language choice is remembered for
-  the next flash. Add a `noask` file inside the zip (or build with
-  `--preset`) for a fully silent install.
+  volume keys are the portable way. Add a `noask` file inside the zip (or
+  build with `--preset`) for a fully silent install.
 
 ## Install
 

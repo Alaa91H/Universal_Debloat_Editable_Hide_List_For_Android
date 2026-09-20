@@ -26,6 +26,9 @@ jobs:
             bash -n "$f" && echo "bash -n OK: $f"
           done
 
+      - name: Run evdev parser tests
+        run: sh tests/test_parse_events.sh
+
       - name: Syntax check python
         run: |
           python -m py_compile build.py webui/server.py

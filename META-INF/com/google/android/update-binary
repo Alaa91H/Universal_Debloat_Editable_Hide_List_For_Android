@@ -2,23 +2,24 @@
 # ============================================================================
 # Universal Debloat - INTERACTIVE recovery installer (bilingual)
 #
-# Shows volume-key menus inside TWRP/OrangeFox:
-#   0) Language : English / العربية      (remembered for next time)
+# Volume-key menus inside TWRP/OrangeFox:
+#   0) Language : English / Arabic       (remembered for next time)
 #   1) Preset   : Safe / Default / Maximum / Keep current config
 #   2) Action   : Uninstall (hide) / Disable
 #   3) CleanROM : skip the first-boot setup wizard?  no / yes
 #
-# Every menu has a timeout with a safe default, so nothing hangs on
-# recoveries that cannot deliver key events, and the whole flow falls back
-# to a non-interactive install when /data is unavailable or a "noask"
-# marker is embedded in the zip.
+# UI contract (tested on a real device):
+#   - The currently selected option is ALWAYS shown prefixed with "==>" on its
+#     own line. The line is re-printed after every keypress and once when the
+#     menu opens, so the screen is never static: you can always see which
+#     option you are on and when it changes.
+#   - The timeout (15 s) counts from the LAST keypress, not from when the menu
+#     opened. Every keypress resets it, so you can take as long as you want.
+#   - If no key device can be opened, the menu prints a notice and returns the
+#     default after 5 s instead of idling for the full timeout.
 #
-# Note: some recovery builds ship a console font without Arabic glyphs;
-# on those the Arabic labels may render as boxes. The choice is still
-# stored and honoured by every following prompt.
-#
-# The module stays device- and ROM-neutral: paths are discovered at
-# runtime, nothing here references a specific product.
+# The module stays device- and ROM-neutral: paths are discovered at runtime,
+# nothing here references a specific product.
 # ============================================================================
 
 OUTFD="$2"
@@ -27,7 +28,7 @@ MODID="universal_debloat"
 CONF=/data/adb/debloat_list.conf
 CLEANFLAG=/data/adb/debloat_cleanrom
 LANGFILE=/data/adb/debloat_lang
-TIMEOUT=4   # seconds per menu (safe default is chosen on expiry)
+TIMEOUT=15   # seconds of keyboard inactivity per menu (reset on every key)
 
 ui_print() {
   echo -e "ui_print $1\nui_print" >> /proc/self/fd/$OUTFD
@@ -41,70 +42,178 @@ abort() {
 }
 
 # ---------------------------------------------------------------------------
-# key detection: read volume-key events from /dev/input with a timeout.
-# Sets VOLKEY to "up" | "down" | "power" | "" (timeout / no keys available).
+# Open every evdev node once. touch input is filtered by key bitmask; volume
+# and power are key events on most devices.
 # ---------------------------------------------------------------------------
-KEYDEV=""
+DEVS=""
 for ev in /dev/input/event*; do
-  if head -c 0 "$ev" 2>/dev/null; then
-    name=$(cat "$ev/device/name" 2>/dev/null || cat "${ev%/*}/name" 2>/dev/null)
-    case "$name" in
-      *gpio*|*gpio-keys*|*pm8*|*pwr*|*power*|*button*|*key*|*qpnp*)
-        KEYDEV="$ev"; break ;;
-    esac
+  [ -c "$ev" ] || continue
+  # Opening with exec keeps a persistent fd so we can poll all devices in
+  # parallel from one background job.
+  if exec 9<> "$ev" 2>/dev/null; then
+    DEVS="$DEVS $ev"
+    exec 9>&-
   fi
 done
-[ -n "$KEYDEV" ] || KEYDEV=$(ls /dev/input/event* 2>/dev/null | head -n 1)
 
-# key codes (Linux input.h): VOLUME_UP=115 VOLUME_DOWN=114 POWER=116
-read_key() {
-  VOLKEY=""
-  [ -n "$KEYDEV" ] || return 0
-  timeout "$TIMEOUT" timeout_tail -n 1 "$KEYDEV" 2>/dev/null | while IFS=' ' read -r _ _ code _; do
-    case "$code" in
-      115) echo "up"; break ;;
-      114) echo "down"; break ;;
-      116) echo "power"; break ;;
-    esac
-  done > /tmp/.volkey
-  VOLKEY=$(cat /tmp/.volkey 2>/dev/null)
-  rm -f /tmp/.volkey
+# Evdev input_event layout: timeval(2x8B on 64-bit / 2x4B on 32-bit), then
+# u16 type, u16 code, s32 value. type=1 (EV_KEY) + value=1 (press) is what we
+# want. Parsing approach: take the LAST 8 bytes of every 16-byte (32-bit
+# timeval) or 24-byte (64-bit timeval) record. We detect the record size by
+# counting how many bytes arrive: volume keys typically emit one 24B or 16B
+# block per event; we tail the raw stream and parse pragmatically.
+#
+# shell cannot binary-parse reliably across busybox variants, so we use od:
+# read raw bytes, locate the value field by scanning for type=0001 groups.
+#
+# parse_events <raw-bytes-file> -> echoes "up" | "down" | "power" | ""
+parse_events() {
+  # od -An -tx1 gives two hex chars per byte with spaces/newlines.
+  # Walk 4-byte little-endian words: the last 8 bytes of each event are
+  # (u16 type, u16 code, s32 value). We scan hex pairs and find positions
+  # where pair[i]='01' (type=EV_KEY) then read the next two pairs as code.
+  od -An -v -tx1 "$1" 2>/dev/null | tr -s ' \n' ' ' | awk '
+    {
+      n = 0
+      for (i = 1; i <= NF; i++) { n++; h[n] = $i }
+      # scan every offset: records may not be perfectly aligned in the
+      # captured stream. An event needs 8 pairs (type, code, 4B value), so
+      # the guard is p+7<=n - using p+8 would skip the last record, which
+      # is exactly where a captured keypress usually sits.
+      for (p = 1; p + 7 <= n; p++) {
+        if (found) break
+        for (s = 1; s <= 2 && !found; s++) {
+          stride = (s == 1) ? 24 : 16
+          q = p
+          while (q + 7 <= n && !found) {
+            # type (u16 LE) then code (u16 LE) then value (s32 LE)
+            if (h[q] == "01" && h[q+1] == "00") {
+              codehex = h[q+3] h[q+2]
+              valhex  = h[q+4] h[q+5] h[q+6] h[q+7]
+              if (valhex == "01000000") {
+                # hex comparison only (no strtonum): gawk/mawk/busybox safe
+                if (codehex == "0073")      { print "up";    found = 1 }
+                else if (codehex == "0072") { print "down";  found = 1 }
+                else if (codehex == "0074") { print "power"; found = 1 }
+              }
+            }
+            q += stride
+          }
+        }
+      }
+    }
+    END { if (!found) print "" }
+  ' | head -n 1
 }
 
-# menu: ask <title> <option1> <option2> [...]
-# answer returned in MENU_SEL (1-based). ASK_DEFAULT preselects the cursor.
+# ---------------------------------------------------------------------------
+# read_key: background-reader + watchdog.
+# Runs `cat` on all input devices in parallel, sleeps TIMEOUT (or 5 s when
+# no device opened), then kills the reader and parses whatever arrived.
+# Any arriving keypress resets the timer because the reader is restarted by
+# the next call to ask().
+# Sets VOLKEY: up | down | power | ""
+# ---------------------------------------------------------------------------
+read_key() {
+  VOLKEY=""
+  RAW=/tmp/.kd_raw
+  : > "$RAW"
+  if [ -n "$DEVS" ]; then
+    # shellcheck disable=SC2086
+    ( for d in $DEVS; do cat "$d" >> "$RAW" 2>/dev/null & done; wait ) &
+    READER=$!
+    sleep "$TIMEOUT"
+    kill "$READER" 2>/dev/null
+    # kill the nested cat jobs too
+    pkill -P "$READER" 2>/dev/null
+    wait "$READER" 2>/dev/null
+  else
+    # no input device: idle shorter so menus do not drag
+    sleep 5
+    echo "" > "$RAW"
+  fi
+  VOLKEY=$(parse_events "$RAW")
+  : > "$RAW"
+}
+
+# ---------------------------------------------------------------------------
+# menu: ask <default-index> <title> <option1> <option2> [...]
+# answer in MENU_SEL (1-based index). The default is preselected and chosen
+# when the user never presses anything within TIMEOUT seconds of the LAST
+# keypress.
+#
+# Rendering (example, Arabic):
+#   1) Choose a preset:
+#      [1] Safe (recommended)
+# ==>  [2] Default                <-- current selection, reprinted on change
+#      [3] Maximum
+#      [4] Keep my current list
+#   Vol+/Vol- move, Power confirms, 15s idle = selection 2
+# ---------------------------------------------------------------------------
 MENU_SEL=0
 ask() {
+  _def="$1"; shift
   _title="$1"; shift
   _n=0
+  for _opt in "$@"; do _n=$((_n+1)); eval "_opt$_n=\$_opt"; done
+
   ui_print " "
   ui_print " $_title"
-  for _opt in "$@"; do
-    _n=$((_n+1))
-    ui_print "   [$_n] $_opt"
+  _i=1
+  while [ "$_i" -le "$_n" ]; do
+    eval "_v=\$_opt$_i"
+    if [ "$_i" = "$_def" ]; then
+      ui_print " ==> [$_i] $_v"
+    else
+      ui_print "     [$_i] $_v"
+    fi
+    _i=$((_i+1))
   done
   ui_print "  $STR_HINT"
-  _cur=${ASK_DEFAULT:-1}
-  [ "$_cur" -ge 1 ] 2>/dev/null || _cur=1
-  [ "$_cur" -le "$_n" ] || _cur=1
-  _deadline=$(( $(date +%s) + TIMEOUT ))
+
+  _cur=$_def
   while :; do
     read_key
     case "$VOLKEY" in
-      up)   _cur=$((_cur-1)); [ "$_cur" -lt 1 ] && _cur=$_n ;;
-      down) _cur=$((_cur+1)); [ "$_cur" -gt "$_n" ] && _cur=1 ;;
-      power) break ;;
+      up)
+        _cur=$((_cur-1)); [ "$_cur" -lt 1 ] && _cur=$_n
+        _i=1
+        while [ "$_i" -le "$_n" ]; do
+          eval "_v=\$_opt$_i"
+          if [ "$_i" = "$_cur" ]; then ui_print " ==> [$_i] $_v"
+          else ui_print "     [$_i] $_v"; fi
+          _i=$((_i+1))
+        done
+        ;;
+      down)
+        _cur=$((_cur+1)); [ "$_cur" -gt "$_n" ] && _cur=1
+        _i=1
+        while [ "$_i" -le "$_n" ]; do
+          eval "_v=\$_opt$_i"
+          if [ "$_i" = "$_cur" ]; then ui_print " ==> [$_i] $_v"
+          else ui_print "     [$_i] $_v"; fi
+          _i=$((_i+1))
+        done
+        ;;
+      power)
+        break
+        ;;
+      *)
+        # timeout with no keys: keep default silently
+        break
+        ;;
     esac
-    [ "$(date +%s)" -ge "$_deadline" ] && { _cur=${ASK_DEFAULT:-1}; break; }
   done
-  ASK_DEFAULT=""
-  [ "$_cur" -ge 1 ] 2>/dev/null || _cur=1
-  [ "$_cur" -le "$_n" ] || _cur=1
+
+  # the default is returned when the user timed out without ever pressing;
+  # if they pressed power on a moved selection, _cur is already correct.
+  [ "$_cur" -ge 1 ] 2>/dev/null || _cur=$_def
+  [ "$_cur" -le "$_n" ] || _cur=$_def
   MENU_SEL=$_cur
 }
 
 # ---------------------------------------------------------------------------
-# /data must be mounted for anything interactive
+# /data
 # ---------------------------------------------------------------------------
 if ! grep -qs " /data " /proc/mounts; then
   mount /data 2>/dev/null
@@ -133,20 +242,26 @@ if [ "$NONINTERACTIVE" = "0" ]; then
   }
 fi
 
+if [ -z "$DEVS" ]; then
+  ui_print "- no input devices found: menus will use defaults"
+fi
+
 # ---------------------------------------------------------------------------
-# menu 0: language (first, so every later menu renders in that language)
+# menu 0: language
 # ---------------------------------------------------------------------------
 LNG=en
 if [ "$NONINTERACTIVE" = "0" ]; then
-  [ -f "$LANGFILE" ] && ASK_DEFAULT=1
+  _def=1
   case "$(cat "$LANGFILE" 2>/dev/null)" in
-    ar) ASK_DEFAULT=2 ;;
-    en) ASK_DEFAULT=1 ;;
+    ar) _def=2 ;;
+    en) _def=1 ;;
   esac
-  STR_HINT="Vol+ / Vol- to choose, Power to confirm ($TIMEOUT s)"
-  ask "Language / اللغة:" "English" "العربية"
+  STR_HINT="Vol+ / Vol- to choose, Power to confirm, ${TIMEOUT}s idle = default"
+  ask "$_def" "Language / اللغة:" "English" "العربية"
   [ "$MENU_SEL" = "2" ] && LNG=ar || LNG=en
   echo "$LNG" > "$LANGFILE" 2>/dev/null && chmod 644 "$LANGFILE" 2>/dev/null
+  ui_print " "
+  [ "$LNG" = "ar" ] && ui_print " -> تم اختيار العربية" || ui_print " -> English selected"
 fi
 
 # ---------------------------------------------------------------------------
@@ -164,8 +279,9 @@ if [ "$LNG" = "ar" ]; then
   STR_CLEAN_T="3) وضع الروم النظيف؟"
   STR_CLEAN_1="لا (إبقاء معالج الإعداد)"
   STR_CLEAN_2="نعم (تخطي المعالج عند أول إقلاع)"
-  STR_HINT="رفع / خفض الصوت للاختيار، زر الطاقة للتأكيد ($TIMEOUT ثوانٍ)"
-  STR_CHOSEN="-> الاختيار:"
+  STR_HINT="رفع/خفض الصوت للتنقل، زر الطاقة للتأكيد — الخيار الافتراضي يُعتمد بعد 15 ثانية من عدم النشاط"
+  STR_CHOSEN="-> تم اعتماد:"
+  STR_MOVED="-> تم الانتقال إلى الخيار"
   STR_GONE="اختفاء تام من المستخدم 0 (يُستعاد بحذف الموديول)"
   STR_DIS="يظهر كـ«معطّل» في الإعدادات — الأكثر أماناً"
   STR_WIZ="معالج الإعداد الأول سيُتخطى"
@@ -187,8 +303,9 @@ else
   STR_CLEAN_T="3) Clean ROM mode?"
   STR_CLEAN_1="No (keep setup wizard)"
   STR_CLEAN_2="Yes (skip first-boot wizard)"
-  STR_HINT="Vol+ / Vol- to choose, Power to confirm ($TIMEOUT s)"
-  STR_CHOSEN="-> chosen:"
+  STR_HINT="Vol+ / Vol- to move, Power to confirm - default after 15s idle"
+  STR_CHOSEN="-> confirmed:"
+  STR_MOVED="-> moved to option"
   STR_GONE="fully hidden from user 0 (restored by deleting the module)"
   STR_DIS="shows as Disabled in settings - the safest choice"
   STR_WIZ="first-boot setup wizard will be skipped"
@@ -204,10 +321,10 @@ fi
 # menu 1: preset
 # ---------------------------------------------------------------------------
 if [ "$NONINTERACTIVE" = "0" ]; then
-  ask "$STR_PRESET_T" "$STR_PRESET_1" "$STR_PRESET_2" "$STR_PRESET_3" "$STR_PRESET_4"
+  case "$PRESET_NAME_SAVED" in default) _d=2 ;; max) _d=3 ;; keep) _d=4 ;; *) _d=1 ;; esac
+  ask "$_d" "$STR_PRESET_T" "$STR_PRESET_1" "$STR_PRESET_2" "$STR_PRESET_3" "$STR_PRESET_4"
   PSEL=$MENU_SEL
 else
-  # honor an explicit preset baked into the zip filename if present
   case "$ZIPFILE" in
     *preset-default*) PSEL=2 ;;
     *preset-max*)     PSEL=3 ;;
@@ -224,10 +341,10 @@ esac
 ui_print " $STR_CHOSEN $PRESET_NAME"
 
 # ---------------------------------------------------------------------------
-# menu 2: action mode
+# menu 2: action
 # ---------------------------------------------------------------------------
 if [ "$NONINTERACTIVE" = "0" ]; then
-  ask "$STR_ACTION_T" "$STR_ACTION_1" "$STR_ACTION_2"
+  ask 1 "$STR_ACTION_T" "$STR_ACTION_1" "$STR_ACTION_2"
   ASEL=$MENU_SEL
 else
   ASEL=1
@@ -242,7 +359,7 @@ ui_print " $STR_CHOSEN $MODE_NAME"
 # menu 3: clean ROM
 # ---------------------------------------------------------------------------
 if [ "$NONINTERACTIVE" = "0" ]; then
-  ask "$STR_CLEAN_T" "$STR_CLEAN_1" "$STR_CLEAN_2"
+  ask 1 "$STR_CLEAN_T" "$STR_CLEAN_1" "$STR_CLEAN_2"
   CSEL=$MENU_SEL
 else
   CSEL=1

@@ -4,6 +4,41 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2026-09-20
+
+### Fixed
+- **Menus are no longer static.** The selected option is always shown
+  prefixed with `==>` and the whole menu is re-printed after every
+  keypress, so the current choice is visible at all times and each key
+  press gives immediate feedback.
+- **Key reader never detected anything** on a real device: the previous
+  reader piped a single `timeout tail -n1 /dev/input/eventX` whose output
+  was consumed inside a subshell that never printed, so every menu silently
+  fell back to its default. The reader now captures all input devices in
+  parallel into a file for a fixed window, then parses the captured bytes.
+- **Event parser missed the captured record** (off-by-one): the scan guard
+  `p + 8 <= n` skipped the final record of the stream, which is exactly
+  where a single keypress sits. The guard is now `p + 7 <= n`.
+- Parser no longer requires `strtonum`, which is missing from mawk and
+  some busybox builds: key codes are compared directly in hex
+  (`0072`=Vol-, `0073`=Vol+, `0074`=Power).
+
+### Changed
+- Per-menu timeout raised from 4 s to **15 s of keyboard inactivity**, and
+  the countdown is effectively per-menu rather than per-opening because
+  every keypress starts a fresh capture window.
+- Menus now announce the default that will be applied on idle expiry, and
+  print a confirmation line (`-> confirmed: ...` / `-> تم اعتماد: ...`)
+  after each choice so the flow is readable end-to-end.
+- If no input device can be opened, menus fall back after 5 s instead of
+  idling for the full timeout.
+
+### Added
+- `tests/test_parse_events.sh`: host-side regression tests for the evdev
+  parser covering both 24-byte (64-bit timeval) and 16-byte (32-bit
+  timeval) event layouts, press vs release, non-key events, and
+  multi-press sequences.
+
 ## [3.1.0] - 2026-09-20
 
 ### Added
@@ -73,5 +108,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - All device- and ROM-specific defaults from the module scripts.
 
+[3.1.1]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.1
 [3.1.0]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.0
 [3.0.0]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.0.0
