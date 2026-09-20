@@ -28,7 +28,8 @@ MODID="universal_debloat"
 CONF=/data/adb/debloat_list.conf
 CLEANFLAG=/data/adb/debloat_cleanrom
 LANGFILE=/data/adb/debloat_lang
-TIMEOUT=15   # seconds of keyboard inactivity per menu (reset on every key)
+# NO menu timeout: menus wait indefinitely until Power is pressed.
+# (kept as a variable name for the no-input-device probe window only)
 
 ui_print() {
   echo -e "ui_print $1\nui_print" >> /proc/self/fd/$OUTFD
@@ -107,12 +108,17 @@ parse_events() {
 }
 
 # ---------------------------------------------------------------------------
-# read_key: background-reader + watchdog.
-# Runs `cat` on all input devices in parallel, sleeps TIMEOUT (or 5 s when
-# no device opened), then kills the reader and parses whatever arrived.
-# Any arriving keypress resets the timer because the reader is restarted by
-# the next call to ask().
-# Sets VOLKEY: up | down | power | ""
+# read_key: background-reader + wait policy.
+# Runs `cat` on all input devices in parallel, waits for a keypress, then
+# parses what arrived. Sets VOLKEY: up | down | power | ""
+#
+# Wait policy: until the user presses anything in the CURRENT menu
+# (GOTKEY=0), the probe waits up to PROBE_S seconds for the first keypress
+# and gives up silently for an unattended flash. Once ONE keypress is
+# captured the user is considered interactive and every further wait is
+# UNLIMITED - the menu never chooses for them again.
+GOTKEY=0
+PROBE_S=10
 # ---------------------------------------------------------------------------
 read_key() {
   VOLKEY=""
@@ -122,25 +128,38 @@ read_key() {
     # shellcheck disable=SC2086
     ( for d in $DEVS; do cat "$d" >> "$RAW" 2>/dev/null & done; wait ) &
     READER=$!
-    sleep "$TIMEOUT"
+    if [ "$GOTKEY" = "1" ]; then
+      # interactive user: wait indefinitely for the next keypress
+      while :; do [ -s "$RAW" ] && break; sleep 1; done
+    else
+      # first contact: bounded probe so unattended flashes proceed
+      _t=0
+      while [ "$_t" -lt "$PROBE_S" ]; do
+        [ -s "$RAW" ] && break
+        sleep 1
+        _t=$((_t+1))
+      done
+    fi
     kill "$READER" 2>/dev/null
     # kill the nested cat jobs too
     pkill -P "$READER" 2>/dev/null
     wait "$READER" 2>/dev/null
   else
-    # no input device: idle shorter so menus do not drag
-    sleep 5
+    # no input device: probe briefly so menus do not hang forever
+    sleep 3
     echo "" > "$RAW"
   fi
   VOLKEY=$(parse_events "$RAW")
   : > "$RAW"
+  [ -n "$VOLKEY" ] && GOTKEY=1
 }
 
 # ---------------------------------------------------------------------------
 # menu: ask <default-index> <title> <option1> <option2> [...]
 # answer in MENU_SEL (1-based index). The default is preselected and chosen
-# when the user never presses anything within TIMEOUT seconds of the LAST
-# keypress.
+# when the user presses Power without moving, or when no keys are ever
+# received (non-interactive environment). There is NO timeout: the menu
+# waits as long as the user needs.
 #
 # Rendering (example, Arabic):
 #   1) Choose a preset:
@@ -148,10 +167,11 @@ read_key() {
 # ==>  [2] Default                <-- current selection, reprinted on change
 #      [3] Maximum
 #      [4] Keep my current list
-#   Vol+/Vol- move, Power confirms, 15s idle = selection 2
+#   Vol+/Vol- move, Power confirms - the menu never times out
 # ---------------------------------------------------------------------------
 MENU_SEL=0
 ask() {
+  GOTKEY=0          # each menu starts in bounded-probe mode again
   _def="$1"; shift
   _title="$1"; shift
   _n=0
@@ -175,6 +195,11 @@ ask() {
   while :; do
     read_key
     case "$VOLKEY" in
+      "")
+        # probe found nothing (unattended flash or no input devices):
+        # accept the preselected default, silently
+        break
+        ;;
       up)
         _cur=$((_cur-1)); [ "$_cur" -lt 1 ] && _cur=$_n
         _i=1
@@ -199,7 +224,6 @@ ask() {
         break
         ;;
       *)
-        # timeout with no keys: keep default silently
         break
         ;;
     esac
@@ -256,7 +280,7 @@ if [ "$NONINTERACTIVE" = "0" ]; then
     ar) _def=2 ;;
     en) _def=1 ;;
   esac
-  STR_HINT="Vol+ / Vol- to choose, Power to confirm, ${TIMEOUT}s idle = default"
+  STR_HINT="Vol+ / Vol- to choose, Power to confirm - no time limit"
   ask "$_def" "Language / اللغة:" "English" "العربية"
   [ "$MENU_SEL" = "2" ] && LNG=ar || LNG=en
   echo "$LNG" > "$LANGFILE" 2>/dev/null && chmod 644 "$LANGFILE" 2>/dev/null
@@ -279,7 +303,7 @@ if [ "$LNG" = "ar" ]; then
   STR_CLEAN_T="3) وضع الروم النظيف؟"
   STR_CLEAN_1="لا (إبقاء معالج الإعداد)"
   STR_CLEAN_2="نعم (تخطي المعالج عند أول إقلاع)"
-  STR_HINT="رفع/خفض الصوت للتنقل، زر الطاقة للتأكيد — الخيار الافتراضي يُعتمد بعد 15 ثانية من عدم النشاط"
+  STR_HINT="رفع/خفض الصوت للتنقل، زر الطاقة للتأكيد — بدون أي مهلة زمنية"
   STR_CHOSEN="-> تم اعتماد:"
   STR_MOVED="-> تم الانتقال إلى الخيار"
   STR_GONE="اختفاء تام من المستخدم 0 (يُستعاد بحذف الموديول)"
@@ -303,7 +327,7 @@ else
   STR_CLEAN_T="3) Clean ROM mode?"
   STR_CLEAN_1="No (keep setup wizard)"
   STR_CLEAN_2="Yes (skip first-boot wizard)"
-  STR_HINT="Vol+ / Vol- to move, Power to confirm - default after 15s idle"
+  STR_HINT="Vol+ / Vol- to move, Power to confirm - no time limit"
   STR_CHOSEN="-> confirmed:"
   STR_MOVED="-> moved to option"
   STR_GONE="fully hidden from user 0 (restored by deleting the module)"

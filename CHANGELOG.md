@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.2] - 2026-09-20
+
+### Changed
+- **Menus no longer time out.** There is no countdown anywhere in the
+  recovery installer: every menu waits for you to press Power, however
+  long that takes. The previous 15 s idle default (which could confirm an
+  option while you were still reading) is gone.
+- Wait policy replaced by a first-contact probe: each menu gives an
+  unattended flash up to 10 s to press a first key. Once one keypress is
+  detected the user is considered interactive and all further waits are
+  unlimited - the installer can never pick an option for them again.
+  Unattended flashes (CI, automated testing) still proceed automatically
+  with the preselected defaults.
+- Hint lines updated in both languages (`- no time limit` /
+  `- بدون أي مهلة زمنية`).
+
 ## [3.1.1] - 2026-09-20
 
 ### Fixed
@@ -108,6 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - All device- and ROM-specific defaults from the module scripts.
 
+[3.1.2]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.2
 [3.1.1]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.1
 [3.1.0]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.0
 [3.0.0]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.0.0
