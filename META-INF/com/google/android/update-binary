@@ -160,13 +160,14 @@ read_key() {
 # received (non-interactive environment). There is NO timeout: the menu
 # waits as long as the user needs.
 #
-# Rendering (example, Arabic):
+# Rendering example:
 #   1) Choose a preset:
 #      [1] Safe (recommended)
 # ==>  [2] Default                <-- current selection, reprinted on change
 #      [3] Maximum
 #      [4] Keep my current list
-#   Vol+/Vol- move, Power confirms - the menu never times out
+#   Vol+ = next option, Vol- = confirm - the menu never times out
+#   (Power is deliberately ignored: in recovery it blanks the screen)
 # ---------------------------------------------------------------------------
 MENU_SEL=0
 ask() {
@@ -200,16 +201,7 @@ ask() {
         break
         ;;
       up)
-        _cur=$((_cur-1)); [ "$_cur" -lt 1 ] && _cur=$_n
-        _i=1
-        while [ "$_i" -le "$_n" ]; do
-          eval "_v=\$_opt$_i"
-          if [ "$_i" = "$_cur" ]; then ui_print " ==> [$_i] $_v"
-          else ui_print "     [$_i] $_v"; fi
-          _i=$((_i+1))
-        done
-        ;;
-      down)
+        # Vol+ cycles to the next option and reprints the menu
         _cur=$((_cur+1)); [ "$_cur" -gt "$_n" ] && _cur=1
         _i=1
         while [ "$_i" -le "$_n" ]; do
@@ -219,17 +211,22 @@ ask() {
           _i=$((_i+1))
         done
         ;;
-      power)
+      down)
+        # Vol- confirms the currently highlighted option
         break
         ;;
+      power)
+        # ignored on purpose: Power blanks the recovery screen.
+        # re-show the hint so the user learns the correct keys.
+        ui_print "  $STR_IGNORE"
+        ;;
       *)
-        break
         ;;
     esac
   done
 
-  # the default is returned when the user timed out without ever pressing;
-  # if they pressed power on a moved selection, _cur is already correct.
+  # the default is returned when the user never pressed anything;
+  # if they confirmed a moved selection with Vol-, _cur is already correct.
   [ "$_cur" -ge 1 ] 2>/dev/null || _cur=$_def
   [ "$_cur" -le "$_n" ] || _cur=$_def
   MENU_SEL=$_cur
@@ -283,7 +280,8 @@ STR_ACTION_2="Disable (recommended)"
 STR_CLEAN_T="3) Clean ROM mode?"
 STR_CLEAN_1="No (keep setup wizard)"
 STR_CLEAN_2="Yes (skip first-boot wizard)"
-STR_HINT="Vol+ / Vol- to move, Power to confirm - no time limit"
+STR_HINT="Vol+ = next option, Vol- = confirm - no time limit"
+STR_IGNORE="(Power ignored - use Vol+ to move, Vol- to confirm)"
 STR_CHOSEN="-> confirmed:"
 STR_MOVED="-> moved to option"
 STR_GONE="fully hidden from user 0 (restored by deleting the module)"

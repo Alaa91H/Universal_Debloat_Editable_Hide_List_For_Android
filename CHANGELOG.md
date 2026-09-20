@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-09-20
+
+### Changed
+- **Volume-key model redesigned around how recovery actually behaves.**
+  Power is no longer the confirm key - in recovery it blanks the screen.
+  The controls are now:
+  - **Vol+ = move to the next option** (cycles, live `==>` marker)
+  - **Vol- = confirm** the highlighted option
+  - Power is deliberately ignored; the installer reprints a short reminder
+    line instead of losing the user's progress.
+- Hint line and on-screen reminder updated accordingly.
+
 ## [3.2.0] - 2026-09-20
 
 ### Removed
@@ -136,6 +148,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - All device- and ROM-specific defaults from the module scripts.
 
+[3.2.1]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.2.1
 [3.2.0]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.2.0
 [3.1.2]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.2
 [3.1.1]: https://github.com/Alaa91H/Universal_Debloat_Editable_Hide_List_For_Android/releases/tag/v3.1.1

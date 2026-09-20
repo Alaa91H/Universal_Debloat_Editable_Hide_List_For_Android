@@ -1,6 +1,6 @@
 id=universal_debloat
 name=Universal Debloat (Editable Hide List)
-version=v3.2.0
-versionCode=6
+version=v3.2.1
+versionCode=7
 author=Alaa91H
 description=Systemless manager for unwanted built-in apps. Interactive recovery installer (volume-key menus: preset, uninstall/disable, clean-ROM) with non-interactive fallback. Reads an editable config (/data/adb/debloat_list.conf). Works on any device and any ROM with KernelSU or Magisk. Removing the module restores everything.
