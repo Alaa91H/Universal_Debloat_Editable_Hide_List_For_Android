@@ -1,0 +1,8 @@
+# Universal Debloat
+
+Default ignore list for the universal debloat module. One package per line.
+Lines starting with '#' are comments. A '!' prefix keeps the package.
+
+This file is machine-neutral on purpose: it contains only packages that are
+safe to remove on virtually any device, plus keep-rules that protect NFC and
+core UI packages everywhere.

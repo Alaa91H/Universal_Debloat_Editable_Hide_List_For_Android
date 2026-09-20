@@ -1,0 +1,326 @@
+#!/sbin/sh
+# ============================================================================
+# Universal Debloat - INTERACTIVE recovery installer (bilingual)
+#
+# Shows volume-key menus inside TWRP/OrangeFox:
+#   0) Language : English / العربية      (remembered for next time)
+#   1) Preset   : Safe / Default / Maximum / Keep current config
+#   2) Action   : Uninstall (hide) / Disable
+#   3) CleanROM : skip the first-boot setup wizard?  no / yes
+#
+# Every menu has a timeout with a safe default, so nothing hangs on
+# recoveries that cannot deliver key events, and the whole flow falls back
+# to a non-interactive install when /data is unavailable or a "noask"
+# marker is embedded in the zip.
+#
+# Note: some recovery builds ship a console font without Arabic glyphs;
+# on those the Arabic labels may render as boxes. The choice is still
+# stored and honoured by every following prompt.
+#
+# The module stays device- and ROM-neutral: paths are discovered at
+# runtime, nothing here references a specific product.
+# ============================================================================
+
+OUTFD="$2"
+ZIPFILE="$3"
+MODID="universal_debloat"
+CONF=/data/adb/debloat_list.conf
+CLEANFLAG=/data/adb/debloat_cleanrom
+LANGFILE=/data/adb/debloat_lang
+TIMEOUT=4   # seconds per menu (safe default is chosen on expiry)
+
+ui_print() {
+  echo -e "ui_print $1\nui_print" >> /proc/self/fd/$OUTFD
+}
+
+abort() {
+  ui_print "  ! $1"
+  ui_print "  ! Installation aborted"
+  sleep 3
+  exit 1
+}
+
+# ---------------------------------------------------------------------------
+# key detection: read volume-key events from /dev/input with a timeout.
+# Sets VOLKEY to "up" | "down" | "power" | "" (timeout / no keys available).
+# ---------------------------------------------------------------------------
+KEYDEV=""
+for ev in /dev/input/event*; do
+  if head -c 0 "$ev" 2>/dev/null; then
+    name=$(cat "$ev/device/name" 2>/dev/null || cat "${ev%/*}/name" 2>/dev/null)
+    case "$name" in
+      *gpio*|*gpio-keys*|*pm8*|*pwr*|*power*|*button*|*key*|*qpnp*)
+        KEYDEV="$ev"; break ;;
+    esac
+  fi
+done
+[ -n "$KEYDEV" ] || KEYDEV=$(ls /dev/input/event* 2>/dev/null | head -n 1)
+
+# key codes (Linux input.h): VOLUME_UP=115 VOLUME_DOWN=114 POWER=116
+read_key() {
+  VOLKEY=""
+  [ -n "$KEYDEV" ] || return 0
+  timeout "$TIMEOUT" timeout_tail -n 1 "$KEYDEV" 2>/dev/null | while IFS=' ' read -r _ _ code _; do
+    case "$code" in
+      115) echo "up"; break ;;
+      114) echo "down"; break ;;
+      116) echo "power"; break ;;
+    esac
+  done > /tmp/.volkey
+  VOLKEY=$(cat /tmp/.volkey 2>/dev/null)
+  rm -f /tmp/.volkey
+}
+
+# menu: ask <title> <option1> <option2> [...]
+# answer returned in MENU_SEL (1-based). ASK_DEFAULT preselects the cursor.
+MENU_SEL=0
+ask() {
+  _title="$1"; shift
+  _n=0
+  ui_print " "
+  ui_print " $_title"
+  for _opt in "$@"; do
+    _n=$((_n+1))
+    ui_print "   [$_n] $_opt"
+  done
+  ui_print "  $STR_HINT"
+  _cur=${ASK_DEFAULT:-1}
+  [ "$_cur" -ge 1 ] 2>/dev/null || _cur=1
+  [ "$_cur" -le "$_n" ] || _cur=1
+  _deadline=$(( $(date +%s) + TIMEOUT ))
+  while :; do
+    read_key
+    case "$VOLKEY" in
+      up)   _cur=$((_cur-1)); [ "$_cur" -lt 1 ] && _cur=$_n ;;
+      down) _cur=$((_cur+1)); [ "$_cur" -gt "$_n" ] && _cur=1 ;;
+      power) break ;;
+    esac
+    [ "$(date +%s)" -ge "$_deadline" ] && { _cur=${ASK_DEFAULT:-1}; break; }
+  done
+  ASK_DEFAULT=""
+  [ "$_cur" -ge 1 ] 2>/dev/null || _cur=1
+  [ "$_cur" -le "$_n" ] || _cur=1
+  MENU_SEL=$_cur
+}
+
+# ---------------------------------------------------------------------------
+# /data must be mounted for anything interactive
+# ---------------------------------------------------------------------------
+if ! grep -qs " /data " /proc/mounts; then
+  mount /data 2>/dev/null
+fi
+if ! grep -qs " /data " /proc/mounts; then
+  mount -t ext4 /dev/block/bootdevice/by-name/userdata /data 2>/dev/null
+fi
+
+ui_print " "
+ui_print " Universal Debloat - interactive installer"
+ui_print " systemless: no ROM partition is modified"
+
+if ! grep -qs " /data " /proc/mounts; then
+  ui_print "- /data unavailable, using bundled default list"
+  NONINTERACTIVE=1
+else
+  NONINTERACTIVE=0
+fi
+
+# a "noask" marker inside the zip skips the menus (silent install)
+if [ "$NONINTERACTIVE" = "0" ]; then
+  unzip -o "$ZIPFILE" noask -d /tmp >/dev/null 2>&1 && [ -f /tmp/noask ] && {
+    NONINTERACTIVE=1
+    ui_print "- noask marker found: silent install"
+    rm -f /tmp/noask
+  }
+fi
+
+# ---------------------------------------------------------------------------
+# menu 0: language (first, so every later menu renders in that language)
+# ---------------------------------------------------------------------------
+LNG=en
+if [ "$NONINTERACTIVE" = "0" ]; then
+  [ -f "$LANGFILE" ] && ASK_DEFAULT=1
+  case "$(cat "$LANGFILE" 2>/dev/null)" in
+    ar) ASK_DEFAULT=2 ;;
+    en) ASK_DEFAULT=1 ;;
+  esac
+  STR_HINT="Vol+ / Vol- to choose, Power to confirm ($TIMEOUT s)"
+  ask "Language / اللغة:" "English" "العربية"
+  [ "$MENU_SEL" = "2" ] && LNG=ar || LNG=en
+  echo "$LNG" > "$LANGFILE" 2>/dev/null && chmod 644 "$LANGFILE" 2>/dev/null
+fi
+
+# ---------------------------------------------------------------------------
+# strings
+# ---------------------------------------------------------------------------
+if [ "$LNG" = "ar" ]; then
+  STR_PRESET_T="1) اختر النمط:"
+  STR_PRESET_1="الآمن (موصى به)"
+  STR_PRESET_2="الافتراضي"
+  STR_PRESET_3="الأقصى"
+  STR_PRESET_4="إبقاء قائمتي الحالية"
+  STR_ACTION_T="2) اختر الإجراء:"
+  STR_ACTION_1="حذف (إخفاء تام)"
+  STR_ACTION_2="تعطيل (موصى به)"
+  STR_CLEAN_T="3) وضع الروم النظيف؟"
+  STR_CLEAN_1="لا (إبقاء معالج الإعداد)"
+  STR_CLEAN_2="نعم (تخطي المعالج عند أول إقلاع)"
+  STR_HINT="رفع / خفض الصوت للاختيار، زر الطاقة للتأكيد ($TIMEOUT ثوانٍ)"
+  STR_CHOSEN="-> الاختيار:"
+  STR_GONE="اختفاء تام من المستخدم 0 (يُستعاد بحذف الموديول)"
+  STR_DIS="يظهر كـ«معطّل» في الإعدادات — الأكثر أماناً"
+  STR_WIZ="معالج الإعداد الأول سيُتخطى"
+  STR_WIZNO="معالج الإعداد الأول سيبقى كما هو"
+  STR_CONFNEW="تمت كتابة الإعدادات إلى:"
+  STR_CONFKEEP="تم الإبقاء على الإعدادات الحالية:"
+  STR_DONE="تم التثبيت إلى:"
+  STR_REBOOT="ستُطبَّق التغييرات بعد إعادة التشغيل"
+  STR_RESTORE="حذف الموديول يستعيد كل التطبيقات"
+else
+  STR_PRESET_T="1) Choose a preset:"
+  STR_PRESET_1="Safe (recommended)"
+  STR_PRESET_2="Default"
+  STR_PRESET_3="Maximum"
+  STR_PRESET_4="Keep my current list"
+  STR_ACTION_T="2) Choose an action:"
+  STR_ACTION_1="Uninstall (hidden)"
+  STR_ACTION_2="Disable (recommended)"
+  STR_CLEAN_T="3) Clean ROM mode?"
+  STR_CLEAN_1="No (keep setup wizard)"
+  STR_CLEAN_2="Yes (skip first-boot wizard)"
+  STR_HINT="Vol+ / Vol- to choose, Power to confirm ($TIMEOUT s)"
+  STR_CHOSEN="-> chosen:"
+  STR_GONE="fully hidden from user 0 (restored by deleting the module)"
+  STR_DIS="shows as Disabled in settings - the safest choice"
+  STR_WIZ="first-boot setup wizard will be skipped"
+  STR_WIZNO="first-boot setup wizard stays as-is"
+  STR_CONFNEW="config written to:"
+  STR_CONFKEEP="keeping existing config:"
+  STR_DONE="installed to:"
+  STR_REBOOT="takes effect after next reboot"
+  STR_RESTORE="deleting the module restores the apps"
+fi
+
+# ---------------------------------------------------------------------------
+# menu 1: preset
+# ---------------------------------------------------------------------------
+if [ "$NONINTERACTIVE" = "0" ]; then
+  ask "$STR_PRESET_T" "$STR_PRESET_1" "$STR_PRESET_2" "$STR_PRESET_3" "$STR_PRESET_4"
+  PSEL=$MENU_SEL
+else
+  # honor an explicit preset baked into the zip filename if present
+  case "$ZIPFILE" in
+    *preset-default*) PSEL=2 ;;
+    *preset-max*)     PSEL=3 ;;
+    *)                PSEL=1 ;;
+  esac
+fi
+case $PSEL in
+  1) PRESET=safe;    PRESET_NAME=$STR_PRESET_1 ;;
+  2) PRESET=default; PRESET_NAME=$STR_PRESET_2 ;;
+  3) PRESET=max;     PRESET_NAME=$STR_PRESET_3 ;;
+  4) PRESET=keep;    PRESET_NAME=$STR_PRESET_4 ;;
+  *) PRESET=safe;    PRESET_NAME=$STR_PRESET_1 ;;
+esac
+ui_print " $STR_CHOSEN $PRESET_NAME"
+
+# ---------------------------------------------------------------------------
+# menu 2: action mode
+# ---------------------------------------------------------------------------
+if [ "$NONINTERACTIVE" = "0" ]; then
+  ask "$STR_ACTION_T" "$STR_ACTION_1" "$STR_ACTION_2"
+  ASEL=$MENU_SEL
+else
+  ASEL=1
+fi
+case $ASEL in
+  1) MODE=uninstall; MODE_NAME="$STR_ACTION_1 ($STR_GONE)" ;;
+  *) MODE=disable;   MODE_NAME="$STR_ACTION_2 ($STR_DIS)" ;;
+esac
+ui_print " $STR_CHOSEN $MODE_NAME"
+
+# ---------------------------------------------------------------------------
+# menu 3: clean ROM
+# ---------------------------------------------------------------------------
+if [ "$NONINTERACTIVE" = "0" ]; then
+  ask "$STR_CLEAN_T" "$STR_CLEAN_1" "$STR_CLEAN_2"
+  CSEL=$MENU_SEL
+else
+  CSEL=1
+fi
+case $CSEL in
+  2) CLEANROM=yes ;;
+  *) CLEANROM=no ;;
+esac
+if [ "$CLEANROM" = "yes" ]; then
+  ui_print " $STR_CHOSEN $STR_WIZ"
+else
+  ui_print " $STR_CHOSEN $STR_WIZNO"
+fi
+
+# ---------------------------------------------------------------------------
+# resolve the modules base directory
+# ---------------------------------------------------------------------------
+if [ -d /data/adb/ksu/modules ]; then
+  BASE=/data/adb/ksu/modules
+  ui_print "- KernelSU detected"
+elif [ -d /data/adb/ksu ]; then
+  BASE=/data/adb/modules
+  ui_print "- KernelSU (ksud) detected"
+elif [ -d /data/adb/magisk ]; then
+  BASE=/data/adb/magisk
+  ui_print "- Magisk detected"
+else
+  BASE=/data/adb/modules
+  ui_print "- no manager dir found, using /data/adb/modules"
+fi
+mkdir -p "$BASE"
+
+# ---------------------------------------------------------------------------
+# extract the module
+# ---------------------------------------------------------------------------
+MODDIR="$BASE/$MODID"
+rm -rf "$MODDIR"
+mkdir -p "$MODDIR"
+
+ui_print "- extracting module files"
+unzip -o "$ZIPFILE" module.prop service.sh post-fs-data.sh uninstall.sh customize.sh blank.apk hide_list.txt README.txt -d "$MODDIR" >/dev/null 2>&1 \
+  || abort "unzip failed"
+
+chmod 644 "$MODDIR/module.prop" "$MODDIR/blank.apk" "$MODDIR/customize.sh" "$MODDIR/hide_list.txt" "$MODDIR/README.txt" 2>/dev/null
+chmod 755 "$MODDIR/service.sh" "$MODDIR/post-fs-data.sh" "$MODDIR/uninstall.sh" 2>/dev/null
+chown 0:0 "$MODDIR" "$MODDIR"/* 2>/dev/null
+command -v restorecon >/dev/null 2>&1 && restorecon -R "$BASE" 2>/dev/null
+
+# ---------------------------------------------------------------------------
+# write the user's chosen config (preset + action + cleanrom)
+# ---------------------------------------------------------------------------
+GENLIST="$MODDIR/hide_list.txt"
+if [ "$PRESET" != "keep" ] && [ -f "$ZIPFILE" ]; then
+  unzip -o "$ZIPFILE" "presets/$PRESET.txt" -d /tmp >/dev/null 2>&1 && [ -f "/tmp/presets/$PRESET.txt" ] && GENLIST="/tmp/presets/$PRESET.txt"
+fi
+sed "s/^@mode=.*/@mode=$MODE/" "$GENLIST" > "$MODDIR/hide_list.txt.new" 2>/dev/null \
+  && mv "$MODDIR/hide_list.txt.new" "$MODDIR/hide_list.txt"
+
+if [ ! -f "$CONF" ] || [ "$PRESET" != "keep" ]; then
+  cp -f "$MODDIR/hide_list.txt" "$CONF"
+  chmod 644 "$CONF"
+  ui_print "- $STR_CONFNEW $CONF"
+else
+  ui_print "- $STR_CONFKEEP $CONF"
+fi
+
+if [ "$CLEANROM" = "yes" ]; then
+  touch "$CLEANFLAG"
+  chmod 644 "$CLEANFLAG"
+else
+  rm -f "$CLEANFLAG"
+fi
+
+rm -rf /tmp/presets 2>/dev/null
+
+ui_print " "
+ui_print "- $STR_DONE $MODDIR"
+ui_print "- $STR_REBOOT"
+ui_print "- $STR_RESTORE"
+ui_print " "
+exit 0

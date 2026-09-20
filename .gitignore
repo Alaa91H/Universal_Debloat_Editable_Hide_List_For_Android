@@ -1,0 +1,11 @@
+# .gitignore - Universal Debloat
+__pycache__/
+*.py[cod]
+*.zip
+!Universal_Debloat_v3.1.0.zip
+webui/Universal_Debloat_Custom.zip
+webui/server.log
+webui/server.log.err
+.freebuff/
+Thumbs.db
+.DS_Store

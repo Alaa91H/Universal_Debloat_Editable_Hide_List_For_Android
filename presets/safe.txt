@@ -1,0 +1,31 @@
+# =====================================================================
+# Universal Debloat - SAFE preset
+# Device-neutral baseline: recorder/emergency apps and accessibility
+# stubs. Safe on virtually every device and ROM.
+# =====================================================================
+
+@mode=uninstall
+
+# --- call recording / emergency / voice memo apps ---
+com.chiller3.bcr
+com.google.android.apps.safetyhub
+com.google.android.apps.recorder
+
+# --- accessibility stubs (safe if you do not rely on them) ---
+com.google.android.accessibility.soundamplifier
+com.google.android.accessibility.switchaccess
+com.google.android.marvin.talkback
+com.google.audio.hearing.visualization.accessibility.scribe
+
+# --- novelty/feature stubs ---
+com.android.axion.sandbox
+com.google.android.apps.magicportrait
+com.google.android.glasses.core
+com.google.android.gms.supervision
+
+# --- protected everywhere ---
+!com.android.nfc
+!com.android.systemui
+!com.android.settings
+!com.android.launcher3
+!com.google.android.apps.nexuslauncher

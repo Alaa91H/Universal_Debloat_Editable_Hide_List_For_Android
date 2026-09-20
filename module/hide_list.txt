@@ -1,0 +1,46 @@
+# =====================================================================
+# Universal Debloat - default editable package list
+# Edit the installed copy at /data/adb/debloat_list.conf, then reboot.
+# =====================================================================
+# Rules:
+#   - one package name per line (e.g. com.example.app)
+#   - lines starting with # are comments and are ignored
+#   - a line starting with ! keeps/restores that package
+#   - @mode=uninstall  fully hide packages from user 0        (default)
+#   - @mode=disable    disable packages (reversible, visible as disabled)
+#   - the config file wins over the bundled hide_list.txt
+# =====================================================================
+
+@mode=uninstall
+
+# --- call recording / emergency / voice memo apps ---
+com.chiller3.bcr
+com.google.android.apps.safetyhub
+com.google.android.apps.recorder
+
+# --- apps commonly pre-disabled by ROM maintainers ---
+# isolated sandbox stub
+com.android.axion.sandbox
+# accessibility: sound amplifier
+com.google.android.accessibility.soundamplifier
+# accessibility: switch access
+com.google.android.accessibility.switchaccess
+# live portrait wallpapers
+com.google.android.apps.magicportrait
+# companion-glasses service stub
+com.google.android.glasses.core
+# kids supervision / family link
+com.google.android.gms.supervision
+# accessibility: screen reader
+com.google.android.marvin.talkback
+# accessibility: live captions/labels
+com.google.audio.hearing.visualization.accessibility.scribe
+
+# --- protected by default ---
+# NFC is kept enabled so devices with an NFC radio are not affected.
+# Remove the "!" below on devices without NFC:
+!com.android.nfc
+!com.android.systemui
+!com.android.settings
+!com.android.launcher3
+!com.google.android.apps.nexuslauncher

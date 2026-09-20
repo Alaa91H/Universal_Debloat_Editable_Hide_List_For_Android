@@ -1,0 +1,40 @@
+# =====================================================================
+# Universal Debloat - DEFAULT preset
+# SAFE preset plus common non-essential Google apps.
+# =====================================================================
+
+@mode=uninstall
+
+# --- everything from SAFE ---
+com.chiller3.bcr
+com.google.android.apps.safetyhub
+com.google.android.apps.recorder
+com.google.android.accessibility.soundamplifier
+com.google.android.accessibility.switchaccess
+com.google.android.marvin.talkback
+com.google.audio.hearing.visualization.accessibility.scribe
+com.android.axion.sandbox
+com.google.android.apps.magicportrait
+com.google.android.glasses.core
+com.google.android.gms.supervision
+
+# --- common non-essential Google apps ---
+com.google.android.apps.wellbeing
+com.google.android.apps.betterbug
+com.google.android.apps.restore
+com.google.android.apps.dreamliner
+com.google.android.apps.googleassistant
+com.google.android.apps.tachyon
+com.google.android.videos
+com.google.android.apps.youtube.music
+com.google.android.apps.magazines
+com.google.android.youtube
+com.google.android.feedback
+com.google.android.onetimeinitializer
+
+# --- protected everywhere ---
+!com.android.nfc
+!com.android.systemui
+!com.android.settings
+!com.android.launcher3
+!com.google.android.apps.nexuslauncher

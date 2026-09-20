@@ -1,0 +1,70 @@
+name: Build flashable zip
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint shell scripts
+        run: |
+          git ls-files '*.sh' | while read -r f; do
+            bash -n "$f" && echo "bash -n OK: $f"
+          done
+
+      - name: Syntax check python
+        run: |
+          python -m py_compile build.py webui/server.py
+          echo "python syntax OK"
+
+      - name: Validate module.prop
+        run: |
+          grep -q '^id=' module/module.prop
+          grep -q '^name=' module/module.prop
+          grep -q '^version=' module/module.prop
+          grep -q '^versionCode=' module/module.prop
+          echo "module.prop OK"
+
+      - name: Build flashable zip
+        run: |
+          python build.py --out Universal_Debloat.zip
+          python - <<'PY'
+          import zipfile
+          z = zipfile.ZipFile("Universal_Debloat.zip")
+          assert z.testzip() is None, "corrupt zip entry"
+          names = z.namelist()
+          for required in ("module.prop", "service.sh", "post-fs-data.sh",
+                           "uninstall.sh", "customize.sh", "blank.apk",
+                           "hide_list.txt",
+                           "META-INF/com/google/android/update-binary",
+                           "META-INF/com/google/android/updater-script"):
+              assert required in names, f"missing {required}"
+          print("zip verified:", len(names), "entries")
+          PY
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Universal_Debloat_flashable
+          path: Universal_Debloat.zip
+
+      - name: Attach zip to GitHub release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Universal_Debloat.zip
+          generate_release_notes: true
